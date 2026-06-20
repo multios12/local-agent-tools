@@ -110,9 +110,15 @@ func (s *Server) handleRequest(ctx context.Context, req rpcRequest) (*rpcRespons
 				Version: "0.2.0",
 			},
 			Capabilities: capabilities{
-				Tools: toolsCapability{},
+				Tools:     toolsCapability{},
+				Resources: resourcesCapability{},
+				Prompts:   promptsCapability{},
 			},
 		}), nil
+	case "resources/list":
+		return okResponse(req.ID, resourcesListResult{Resources: []resourceDefinition{}}), nil
+	case "prompts/list":
+		return okResponse(req.ID, promptsListResult{Prompts: []promptDefinition{}}), nil
 	case "tools/list":
 		return okResponse(req.ID, toolsListResult{Tools: []toolDefinition{
 			createCalendarEventToolDefinition(),
@@ -322,15 +328,33 @@ type serverInfo struct {
 }
 
 type capabilities struct {
-	Tools toolsCapability `json:"tools"` // tools 機能
+	Tools     toolsCapability     `json:"tools"`     // tools 機能
+	Resources resourcesCapability `json:"resources"` // resources 機能
+	Prompts   promptsCapability   `json:"prompts"`   // prompts 機能
 }
 
 type toolsCapability struct {
 	ListChanged bool `json:"listChanged,omitempty"` // ツール一覧変更通知の有無
 }
 
+type resourcesCapability struct {
+	ListChanged bool `json:"listChanged,omitempty"` // リソース一覧変更通知の有無
+}
+
+type promptsCapability struct {
+	ListChanged bool `json:"listChanged,omitempty"` // プロンプト一覧変更通知の有無
+}
+
 type toolsListResult struct {
 	Tools []toolDefinition `json:"tools"` // tool 一覧
+}
+
+type resourcesListResult struct {
+	Resources []resourceDefinition `json:"resources"` // resource 一覧
+}
+
+type promptsListResult struct {
+	Prompts []promptDefinition `json:"prompts"` // prompt 一覧
 }
 
 type toolDefinition struct {
@@ -338,6 +362,10 @@ type toolDefinition struct {
 	Description string `json:"description"` // tool の説明
 	InputSchema any    `json:"inputSchema"` // 入力スキーマ
 }
+
+type resourceDefinition struct{}
+
+type promptDefinition struct{}
 
 type toolCallParams struct {
 	Name      string          `json:"name"`      // tool 名

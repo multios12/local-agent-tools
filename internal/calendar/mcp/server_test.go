@@ -46,6 +46,16 @@ func TestServeHandlesInitializeAndToolList(t *testing.T) {
 			frame(map[string]any{
 				"jsonrpc": "2.0",
 				"id":      2,
+				"method":  "resources/list",
+			}) +
+			frame(map[string]any{
+				"jsonrpc": "2.0",
+				"id":      3,
+				"method":  "prompts/list",
+			}) +
+			frame(map[string]any{
+				"jsonrpc": "2.0",
+				"id":      4,
 				"method":  "tools/list",
 			}),
 	)
@@ -58,8 +68,8 @@ func TestServeHandlesInitializeAndToolList(t *testing.T) {
 	}
 
 	responses := readAllFrames(t, output.String())
-	if len(responses) != 2 {
-		t.Fatalf("expected 2 responses, got %d", len(responses))
+	if len(responses) != 4 {
+		t.Fatalf("expected 4 responses, got %d", len(responses))
 	}
 
 	var initResp rpcResponse
@@ -73,8 +83,30 @@ func TestServeHandlesInitializeAndToolList(t *testing.T) {
 		t.Fatalf("unexpected protocol version: %s", initResult.ProtocolVersion)
 	}
 
+	var resourcesResp rpcResponse
+	mustUnmarshal(t, []byte(responses[1]), &resourcesResp)
+	if resourcesResp.Error != nil {
+		t.Fatalf("unexpected resources/list error: %+v", resourcesResp.Error)
+	}
+	var resourcesResult resourcesListResult
+	mustUnmarshal(t, mustMarshal(t, resourcesResp.Result), &resourcesResult)
+	if len(resourcesResult.Resources) != 0 {
+		t.Fatalf("expected 0 resources, got %d", len(resourcesResult.Resources))
+	}
+
+	var promptsResp rpcResponse
+	mustUnmarshal(t, []byte(responses[2]), &promptsResp)
+	if promptsResp.Error != nil {
+		t.Fatalf("unexpected prompts/list error: %+v", promptsResp.Error)
+	}
+	var promptsResult promptsListResult
+	mustUnmarshal(t, mustMarshal(t, promptsResp.Result), &promptsResult)
+	if len(promptsResult.Prompts) != 0 {
+		t.Fatalf("expected 0 prompts, got %d", len(promptsResult.Prompts))
+	}
+
 	var listResp rpcResponse
-	mustUnmarshal(t, []byte(responses[1]), &listResp)
+	mustUnmarshal(t, []byte(responses[3]), &listResp)
 	if listResp.Error != nil {
 		t.Fatalf("unexpected error: %+v", listResp.Error)
 	}

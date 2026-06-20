@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 
@@ -11,21 +12,63 @@ import (
 
 // mcpサーバを起動する
 func main() {
+	logger, closeLog := newLogger()
+	defer closeLog()
+
+	logger.Printf("starting mcpserver pid=%d", os.Getpid())
+	if cwd, err := os.Getwd(); err == nil {
+		logger.Printf("working directory=%s", cwd)
+	} else {
+		logger.Printf("get working directory failed: %v", err)
+	}
+	logger.Printf("env GOOGLE_CALENDAR_ID set=%t", os.Getenv("GOOGLE_CALENDAR_ID") != "")
+	logger.Printf("env GOOGLE_SERVICE_ACCOUNT_JSON set=%t", os.Getenv("GOOGLE_SERVICE_ACCOUNT_JSON") != "")
+	logger.Printf("env GOOGLE_SERVICE_ACCOUNT_FILE=%q", os.Getenv("GOOGLE_SERVICE_ACCOUNT_FILE"))
+
+	logger.Print("initializing google client")
 	googleClient, err := initGoogleClient(context.Background())
 	if err != nil {
-		log.Fatalf("init google client: %v", err)
+		logger.Printf("init google client failed: %v", err)
+		os.Exit(1)
 	}
+	logger.Print("google client initialized")
 
 	defaultCalendarID := os.Getenv("GOOGLE_CALENDAR_ID")
 	if defaultCalendarID == "" {
-		log.Fatal("GOOGLE_CALENDAR_ID is required")
+		logger.Print("GOOGLE_CALENDAR_ID is required")
+		os.Exit(1)
 	}
 
 	svc := calendar.NewService(googleClient, defaultCalendarID)
-	server := calendarmcp.New(svc, log.New(os.Stderr, "", log.LstdFlags))
+	server := calendarmcp.New(svc, logger)
 
+	logger.Print("starting stdio MCP serve loop")
 	if err := server.Serve(context.Background(), os.Stdin, os.Stdout); err != nil {
-		log.Fatalf("mcp server exited: %v", err)
+		logger.Printf("mcp server exited: %v", err)
+		os.Exit(1)
+	}
+	logger.Print("mcp server stopped")
+}
+
+func newLogger() (*log.Logger, func()) {
+	logPath := os.Getenv("MCP_SERVER_LOG_FILE")
+	if logPath == "" {
+		logPath = "mcpserver.log"
+	}
+
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		logger := log.New(os.Stderr, "", log.LstdFlags)
+		logger.Printf("open log file %q failed: %v", logPath, err)
+		return logger, func() {}
+	}
+
+	logger := log.New(io.MultiWriter(os.Stderr, f), "", log.LstdFlags)
+	logger.Printf("logging to %s", logPath)
+	return logger, func() {
+		if err := f.Close(); err != nil {
+			log.New(os.Stderr, "", log.LstdFlags).Printf("close log file %q failed: %v", logPath, err)
+		}
 	}
 }
 

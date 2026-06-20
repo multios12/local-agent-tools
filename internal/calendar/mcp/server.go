@@ -32,6 +32,7 @@ func New(svc *calendar.Service, logger *log.Logger) *Server {
 
 // MCP プロトコルのループを実行する
 func (s *Server) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
+	s.logger.Print("serve loop entered")
 	br := bufio.NewReader(r)
 	bw := bufio.NewWriter(w)
 	defer bw.Flush()
@@ -46,13 +47,17 @@ func (s *Server) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
 		body, err := readFrame(br)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				s.logger.Print("input closed")
 				return nil
 			}
+			s.logger.Printf("read frame failed: %v", err)
 			return err
 		}
+		s.logger.Printf("read frame bytes=%d", len(body))
 
 		var req rpcRequest
 		if err := json.Unmarshal(body, &req); err != nil {
+			s.logger.Printf("parse request failed: %v", err)
 			if err := writeResponse(bw, rpcResponse{
 				JSONRPC: "2.0",
 				Error: &rpcError{
@@ -66,6 +71,7 @@ func (s *Server) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
 		}
 
 		if req.JSONRPC != "2.0" {
+			s.logger.Printf("invalid request jsonrpc=%q hasID=%t", req.JSONRPC, req.hasID())
 			if req.hasID() {
 				if err := writeErrorResponse(bw, req.ID, -32600, "Invalid Request", "jsonrpc must be 2.0"); err != nil {
 					return err
@@ -75,18 +81,23 @@ func (s *Server) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
 		}
 
 		if !req.hasID() {
+			s.logger.Printf("received notification method=%s", req.Method)
 			s.handleNotification(req)
 			continue
 		}
 
+		s.logger.Printf("received request method=%s", req.Method)
 		resp, err := s.handleRequest(ctx, req)
 		if err != nil {
+			s.logger.Printf("handle request method=%s failed: %v", req.Method, err)
 			return err
 		}
 		if resp != nil {
 			if err := writeResponse(bw, *resp); err != nil {
+				s.logger.Printf("write response method=%s failed: %v", req.Method, err)
 				return err
 			}
+			s.logger.Printf("wrote response method=%s error=%t", req.Method, resp.Error != nil)
 		}
 	}
 }

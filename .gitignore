@@ -1,0 +1,5 @@
+/bin
+/cmd/server/__debug*
+.env.debug
+service_account.json
+/.codex

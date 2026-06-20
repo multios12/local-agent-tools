@@ -1,0 +1,33 @@
+{
+	"name": "Dev Container mu-workspace",
+	"build": {
+		"context": "../",
+		"dockerfile": "Dockerfile"
+	},
+	"runArgs": [
+		"--network=host"
+	],
+	"mounts": [
+		"source=${localEnv:USERPROFILE}\\.agents\\skills,target=/root/.agents/skills,type=bind,readonly"
+	],
+	"containerEnv": {
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"editor.codeActionsOnSave": {
+					"source.fixAll.eslint": "always" // ファイル保存時にESLintでフォーマット
+				},
+				"editor.formatOnSave": true
+			},
+			"extensions": [
+				"golang.go",
+				"dbaeumer.vscode-eslint",
+				"openai.chatgpt"
+			]
+		}
+	},
+	"forwardPorts": [
+		3000
+	]
+}
